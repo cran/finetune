@@ -95,8 +95,10 @@ random_integer_neighbor_calc <- function(current, pset, prob, change) {
       smol_range <- floor(prm_rng/10) + 1
       val_diff <- abs(current[[i]] - pool)
       pool <- pool[val_diff <= smol_range  & val_diff > 0]
-      if(length(pool) > 0) {
+      if(length(pool) > 1) {
         current[[i]] <- sample(pool, 1)
+      } else if (length(pool) == 1) {
+        current[[i]] <- pool
       }
     }
   }
@@ -359,8 +361,8 @@ color_event <- function(x) {
 }
 
 get_outcome_names <- function(x, rs) {
-  preproc <- workflows::pull_workflow_preprocessor(x)
-  if (inherits(preproc, "list")) {
+  preproc <- extract_preprocessor(x)
+  if (inherits(preproc, "workflow_variables")) {
     if (any(names(preproc) == "outcomes")) {
       dat <- rs$splits[[1]]$data
       res <- tidyselect::eval_select(preproc$outcomes, data = dat)

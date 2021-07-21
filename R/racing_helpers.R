@@ -126,13 +126,13 @@ test_parameters_bt <- function(x, alpha =  0.05) {
   ## ---------------------------------------------------------------------------
   # Analyze data only on current candidate set
 
-  num_resasmples <-
+  num_resamples <-
     res %>%
     dplyr::count(.config, name = "B")
-  max_resasmples <- max(num_resasmples$B)
+  max_resamples <- max(num_resamples$B)
   analysis_config <-
-    num_resasmples %>%
-    dplyr::filter(B == max_resasmples)
+    num_resamples %>%
+    dplyr::filter(B == max_resamples)
   analysis_data <- dplyr::inner_join(res, analysis_config, by = ".config")
 
   ## -----------------------------------------------------------------------------
@@ -141,8 +141,15 @@ test_parameters_bt <- function(x, alpha =  0.05) {
   season_schedule <- make_config_pairs(analysis_data)
   # Eliminate pairs with all ties
   season_data <- score_season(season_schedule, analysis_data, maximize)
+
   best_team <- levels(season_data$scoring$player_1)[1]
 
+  # Cases, esp with 2 players, where one player doesn't lose any games
+  if (nrow(season_data$scoring) == 0) {
+    return(mercy_rule(season_data, key))
+  }
+
+  best_team <- levels(season_data$scoring$player_1)[1]
   suppressWarnings(
     mod <- BradleyTerry2::BTm(cbind(wins_1, wins_2), player_1, player_2,
                               data = season_data$scoring, br = TRUE)
@@ -162,31 +169,13 @@ test_parameters_bt <- function(x, alpha =  0.05) {
       # a single competition.
       pass = ifelse(upper > 0 & std_err < 500, TRUE, FALSE)
     ) %>%
-    dplyr::bind_rows(
-      tibble::tibble(
-        .config = best_team,
-        value = 0,
-        std_err = 0,
-        lower = 0,
-        upper = 0,
-        pass = TRUE
-      )
-    )
+    dplyr::bind_rows(make_best_results(best_team))
 
 
   ## TODO For both racing methods, make this a function with the configs as
   ## arguments.
   if (length(season_data$eliminated) > 0) {
-    elim_results <-
-      tibble::tibble(
-        .config = season_data$eliminated,
-        value = NA_real_,
-        std_err = NA_real_,
-        lower = NA_real_,
-        upper = NA_real_,
-        pass = FALSE
-      )
-    mod_est <- dplyr::bind_rows(mod_est, elim_results)
+    mod_est <- dplyr::bind_rows(mod_est, make_elim_results(season_data$eliminated))
   }
 
   mod_est <-
@@ -211,6 +200,40 @@ score_match <- function(x, y, maximize) {
   }
 }
 
+make_best_results <- function(player) {
+  tibble::tibble(
+    .config = player,
+    value = 0,
+    std_err = 0,
+    lower = 0,
+    upper = 0,
+    pass = TRUE
+  )
+}
+
+make_elim_results <- function(players) {
+  tibble::tibble(
+    .config = players,
+    value = NA_real_,
+    std_err = NA_real_,
+    lower = NA_real_,
+    upper = NA_real_,
+    pass = FALSE
+  )
+}
+
+mercy_rule <- function(dat, key) {
+  elim <- dat$eliminated
+  lvls <- levels(dat$scoring$player_1)
+  best <- lvls[!(lvls %in% elim)]
+  dplyr::bind_rows(
+    make_best_results(best),
+    make_elim_results(elim)
+  ) %>%
+    dplyr::inner_join(key, by = ".config")
+}
+
+
 score_season <- function(x, dat, maximize = FALSE) {
   # Determine how many matches each team has won. However, if a team loses
   # _all of its games_ (aka getting skunked), do not include it in the BT model
@@ -224,6 +247,7 @@ score_season <- function(x, dat, maximize = FALSE) {
   eliminated <- check_results(dat)
   x <- x %>% dplyr::filter(!(p1 %in% eliminated) & !(p2 %in% eliminated))
   dat <- dat %>% dplyr::filter(!(.config %in% eliminated))
+  current_teams <- unique(dat$.config)
 
   ## -----------------------------------------------------------------------------
 
@@ -263,7 +287,6 @@ score_season <- function(x, dat, maximize = FALSE) {
     dplyr::select(-pair)
 
   # Find overall rankings
-
   player_rankings <-
     dplyr::bind_rows(
       season_results %>% dplyr::select(player = player_1, wins = wins_1),
@@ -299,11 +322,18 @@ score_season <- function(x, dat, maximize = FALSE) {
       dplyr::arrange(dplyr::desc(wins))
   }
 
+  if (nrow(season_results) == 0) {
+    not_elim <- current_teams[!(current_teams %in% eliminated)]
+    lvls <- c(not_elim, eliminated)
+  } else {
+    lvls <- player_rankings$player
+  }
+
   res <-
     season_results %>%
     dplyr::mutate(
-      player_1 = factor(player_1, levels = player_rankings$player),
-      player_2 = factor(player_2, levels = player_rankings$player)
+      player_1 = factor(player_1, levels = lvls),
+      player_2 = factor(player_2, levels = lvls)
     )
   list(scoring = res, eliminated = eliminated)
 }
@@ -486,9 +516,13 @@ fit_anova <- function(x, dat, alpha) {
 
   f <- lmer_formula(x, rs_info)
 
-  mod <- try(lme4::lmer(f, data = dat), silent = TRUE)
+  suppressWarnings(
+    suppressMessages(
+      mod <- try(lme4::lmer(f, data = dat), silent = TRUE)
+    )
+  )
 
-  if (inherits(mod, "try-error")) {
+  if (inherits(mod, "try-error") || !isTRUE(mod@optinfo$conv$opt == 0)) {
     mod <- lm(.estimate ~ .config, data = dat)
   }
   point_est <-
@@ -499,6 +533,7 @@ fit_anova <- function(x, dat, alpha) {
     confint(mod, method = "Wald", level = 1 - alpha, quiet = TRUE) %>%
     mod2tibble() %>%
     setNames(c(".config", "lower", "upper"))
+
   dplyr::inner_join(point_est, interval_est, by = ".config")
 }
 
