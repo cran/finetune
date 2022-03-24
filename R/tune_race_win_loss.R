@@ -69,37 +69,41 @@
 #' \donttest{
 #' library(parsnip)
 #' library(rsample)
-#' library(discrim)
 #' library(dials)
 #'
 #' ## -----------------------------------------------------------------------------
 #'
-#' data(two_class_dat, package = "modeldata")
+#' if (rlang::is_installed(c("discrim", "modeldata"))) {
+#'   library(discrim)
+#'   data(two_class_dat, package = "modeldata")
 #'
-#' set.seed(6376)
-#' rs <- bootstraps(two_class_dat, times = 10)
+#'   set.seed(6376)
+#'   rs <- bootstraps(two_class_dat, times = 10)
 #'
-#' ## -----------------------------------------------------------------------------
+#'   ## -----------------------------------------------------------------------------
 #'
-#' # optimize an regularized discriminant analysis model
-#' rda_spec <-
-#'   discrim_regularized(frac_common_cov = tune(), frac_identity = tune()) %>%
-#'   set_engine("klaR")
+#'   # optimize an regularized discriminant analysis model
+#'   rda_spec <-
+#'     discrim_regularized(frac_common_cov = tune(), frac_identity = tune()) %>%
+#'     set_engine("klaR")
 #'
-#' ## -----------------------------------------------------------------------------
+#'   ## -----------------------------------------------------------------------------
 #'
-#' ctrl <- control_race(verbose_elim = TRUE)
+#'   ctrl <- control_race(verbose_elim = TRUE)
 #'
-#' set.seed(11)
-#' grid_wl <-
-#'   rda_spec %>%
+#'   set.seed(11)
+#'   grid_wl <-
+#'     rda_spec %>%
 #'     tune_race_win_loss(Class ~ ., resamples = rs, grid = 10, control = ctrl)
 #'
-#' # Shows only the fully resampled parameters
-#' show_best(grid_wl, metric = "roc_auc")
+#'   # Shows only the fully resampled parameters
+#'   show_best(grid_wl, metric = "roc_auc")
 #'
-#' plot_race(grid_wl)
+#'   plot_race(grid_wl)
 #' }
+#' }
+#' @return An object with primary class `tune_race` in the same standard format
+#' as objects produced by [tune::tune_grid()].
 #' @seealso [tune::tune_grid()], [control_race()], [tune_race_anova()]
 #' @export
 tune_race_win_loss <- function(object, ...) {
@@ -118,12 +122,14 @@ tune_race_win_loss.default <- function(object, ...) {
 #' @export
 tune_race_win_loss.recipe <- function(object, model, resamples, ..., param_info = NULL,
                                       grid = 10, metrics = NULL, control = control_race()) {
-
   tune::empty_ellipses(...)
 
-  tune_race_win_loss(model, preprocessor = object, resamples = resamples,
-                     param_info = param_info, grid = grid,
-                     metrics = metrics, control = control)
+  tune_race_win_loss(
+    model,
+    preprocessor = object, resamples = resamples,
+    param_info = param_info, grid = grid,
+    metrics = metrics, control = control
+  )
 }
 
 #' @export
@@ -131,9 +137,12 @@ tune_race_win_loss.formula <- function(formula, model, resamples, ..., param_inf
                                        grid = 10, metrics = NULL, control = control_race()) {
   tune::empty_ellipses(...)
 
-  tune_race_win_loss(model, preprocessor = formula, resamples = resamples,
-                     param_info = param_info, grid = grid,
-                     metrics = metrics, control = control)
+  tune_race_win_loss(
+    model,
+    preprocessor = formula, resamples = resamples,
+    param_info = param_info, grid = grid,
+    metrics = metrics, control = control
+  )
 }
 
 #' @export
@@ -141,10 +150,11 @@ tune_race_win_loss.formula <- function(formula, model, resamples, ..., param_inf
 tune_race_win_loss.model_spec <- function(object, preprocessor, resamples, ...,
                                           param_info = NULL, grid = 10, metrics = NULL,
                                           control = control_race()) {
-
   if (rlang::is_missing(preprocessor) || !tune::is_preprocessor(preprocessor)) {
-    rlang::abort(paste("To tune a model spec, you must preprocess",
-                       "with a formula, recipe, or variable specification"))
+    rlang::abort(paste(
+      "To tune a model spec, you must preprocess",
+      "with a formula, recipe, or variable specification"
+    ))
   }
 
   tune::empty_ellipses(...)
@@ -172,7 +182,6 @@ tune_race_win_loss.model_spec <- function(object, preprocessor, resamples, ...,
 tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NULL,
                                         grid = 10, metrics = NULL,
                                         control = control_race()) {
-
   tune::empty_ellipses(...)
 
   tune_race_win_loss_workflow(
@@ -190,7 +199,6 @@ tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NUL
 tune_race_win_loss_workflow <-
   function(object, resamples, param_info = NULL, grid = 10, metrics = NULL,
            control = control_race()) {
-
     rlang::check_installed("BradleyTerry2")
 
     B <- nrow(resamples)
@@ -213,15 +221,17 @@ tune_race_win_loss_workflow <-
       )
 
     param_names <- tune::.get_tune_parameter_names(res)
-    metrics     <- tune::.get_tune_metrics(res)
+    metrics <- tune::.get_tune_metrics(res)
     analysis_metric <- names(attr(metrics, "metrics"))[1]
-    analysis_max    <- attr(attr(metrics, "metrics")[[1]], "direction") == "maximize"
+    analysis_max <- attr(attr(metrics, "metrics")[[1]], "direction") == "maximize"
 
     cols <- tune::get_tune_colors()
     if (control$verbose_elim) {
       msg <-
-        paste("Racing will", ifelse(analysis_max, "maximize", "minimize"),
-              "the", analysis_metric, "metric.")
+        paste(
+          "Racing will", ifelse(analysis_max, "maximize", "minimize"),
+          "the", analysis_metric, "metric."
+        )
       rlang::inform(cols$message$info(paste0(cli::symbol$info, " ", msg)))
       if (control$randomize) {
         msg <- "Resamples are analyzed in a random order."
@@ -234,7 +244,7 @@ tune_race_win_loss_workflow <-
 
     log_final <- TRUE
     num_ties <- 0
-    for(rs in (min_rs + 1):B) {
+    for (rs in (min_rs + 1):B) {
       if (sum(filters_results$pass) == 2) {
         num_ties <- num_ties + 1
       }
@@ -282,4 +292,3 @@ tune_race_win_loss_workflow <-
 
     res
   }
-

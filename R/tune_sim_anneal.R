@@ -115,41 +115,42 @@
 #' library(ggplot2)
 #'
 #' ## -----------------------------------------------------------------------------
+#' if (rlang::is_installed("modeldata")) {
+#'   data(two_class_dat, package = "modeldata")
 #'
-#' data(two_class_dat, package = "modeldata")
+#'   set.seed(5046)
+#'   bt <- bootstraps(two_class_dat, times = 5)
 #'
-#' set.seed(5046)
-#' bt <- bootstraps(two_class_dat, times = 5)
+#'   ## -----------------------------------------------------------------------------
 #'
-#' ## -----------------------------------------------------------------------------
+#'   cart_mod <-
+#'     decision_tree(cost_complexity = tune(), min_n = tune()) %>%
+#'     set_engine("rpart") %>%
+#'     set_mode("classification")
 #'
-#' cart_mod <-
-#'   decision_tree(cost_complexity = tune(), min_n = tune()) %>%
-#'   set_engine("rpart") %>%
-#'   set_mode("classification")
+#'   ## -----------------------------------------------------------------------------
 #'
-#' ## -----------------------------------------------------------------------------
+#'   # For reproducibility, set the seed before running.
+#'   set.seed(10)
+#'   sa_search <-
+#'     cart_mod %>%
+#'     tune_sim_anneal(Class ~ ., resamples = bt, iter = 10)
 #'
-#' # For reproducibility, set the seed before running.
-#' set.seed(10)
-#' sa_search <-
-#'   cart_mod %>%
-#'   tune_sim_anneal(Class ~ ., resamples = bt, iter = 10)
+#'   autoplot(sa_search, metric = "roc_auc", type = "parameters") +
+#'     theme_bw()
 #'
-#' autoplot(sa_search, metric = "roc_auc", type = "parameters") +
-#'   theme_bw()
+#'   ## -----------------------------------------------------------------------------
+#'   # More iterations. `initial` can be any other tune_* object or an integer
+#'   # (for new values).
 #'
-#' ## -----------------------------------------------------------------------------
-#' # More iterations. `initial` can be any other tune_* object or an integer
-#' # (for new values).
+#'   set.seed(11)
+#'   more_search <-
+#'     cart_mod %>%
+#'     tune_sim_anneal(Class ~ ., resamples = bt, iter = 10, initial = sa_search)
 #'
-#' set.seed(11)
-#' more_search <-
-#'   cart_mod %>%
-#'   tune_sim_anneal(Class ~ ., resamples = bt, iter = 10, initial = sa_search)
-#'
-#' autoplot(more_search, metric = "roc_auc", type = "performance") +
-#'   theme_bw()
+#'   autoplot(more_search, metric = "roc_auc", type = "performance") +
+#'     theme_bw()
+#' }
 #' }
 #' @seealso [tune::tune_grid()], [control_sim_anneal()], [yardstick::metric_set()]
 #' @export
@@ -176,12 +177,14 @@ tune_sim_anneal.recipe <- function(object,
                                    metrics = NULL,
                                    initial = 1,
                                    control = control_sim_anneal()) {
-
   tune::empty_ellipses(...)
 
-  tune_sim_anneal(model, preprocessor = object, resamples = resamples,
-                  iter = iter, param_info = param_info,
-                  metrics = metrics,  initial = initial, control = control)
+  tune_sim_anneal(
+    model,
+    preprocessor = object, resamples = resamples,
+    iter = iter, param_info = param_info,
+    metrics = metrics, initial = initial, control = control
+  )
 }
 
 #' @export
@@ -194,12 +197,14 @@ tune_sim_anneal.formula <- function(formula,
                                     metrics = NULL,
                                     initial = 1,
                                     control = control_sim_anneal()) {
-
   tune::empty_ellipses(...)
 
-  tune_sim_anneal(model, preprocessor = formula, resamples = resamples,
-                  iter = iter, param_info = param_info,
-                  metrics = metrics, initial = initial, control = control)
+  tune_sim_anneal(
+    model,
+    preprocessor = formula, resamples = resamples,
+    iter = iter, param_info = param_info,
+    metrics = metrics, initial = initial, control = control
+  )
 }
 
 #' @export
@@ -213,10 +218,11 @@ tune_sim_anneal.model_spec <- function(object,
                                        metrics = NULL,
                                        initial = 1,
                                        control = control_sim_anneal()) {
-
   if (rlang::is_missing(preprocessor) || !tune::is_preprocessor(preprocessor)) {
-    rlang::abort(paste("To tune a model spec, you must preprocess",
-                       "with a formula, recipe, or variable specification"))
+    rlang::abort(paste(
+      "To tune a model spec, you must preprocess",
+      "with a formula, recipe, or variable specification"
+    ))
   }
 
   tune::empty_ellipses(...)
@@ -229,9 +235,12 @@ tune_sim_anneal.model_spec <- function(object,
     wflow <- workflows::add_formula(wflow, preprocessor)
   }
 
-  tune_sim_anneal_workflow(wflow, resamples = resamples, iter = iter,
-                           param_info = param_info, metrics = metrics,
-                           initial = initial, control = control, ...)
+  tune_sim_anneal_workflow(
+    wflow,
+    resamples = resamples, iter = iter,
+    param_info = param_info, metrics = metrics,
+    initial = initial, control = control, ...
+  )
 }
 
 
@@ -246,12 +255,14 @@ tune_sim_anneal.workflow <-
            metrics = NULL,
            initial = 1,
            control = control_sim_anneal()) {
-
     tune::empty_ellipses(...)
 
-    tune_sim_anneal_workflow(object, resamples = resamples, iter = iter,
-                             param_info = param_info, metrics = metrics,
-                             initial = initial, control = control, ...)
+    tune_sim_anneal_workflow(
+      object,
+      resamples = resamples, iter = iter,
+      param_info = param_info, metrics = metrics,
+      initial = initial, control = control, ...
+    )
   }
 
 ## -----------------------------------------------------------------------------
@@ -271,7 +282,7 @@ tune_sim_anneal_workflow <-
     maximize <- attr(attr(metrics, "metrics")[[1]], "direction") == "maximize"
 
     if (is.null(param_info)) {
-      param_info <- dials::parameters(object)
+      param_info <- extract_parameter_set_dials(object)
     }
     tune::check_workflow(object, check_dials = is.null(param_info), pset = param_info)
 
@@ -291,7 +302,7 @@ tune_sim_anneal_workflow <-
         parameters = param_info,
         metrics = metrics,
         outcomes = y_names,
-        rset_info =  rset_info,
+        rset_info = rset_info,
         workflow = object
       ) %>%
       update_config(prefix = "initial")
@@ -310,8 +321,10 @@ tune_sim_anneal_workflow <-
       if (i < iter) {
         cli::cli_alert_danger("Optimization stopped prematurely; returning current results.")
       }
-      out <- tune::new_iteration_results(unsummarized, param_info,
-                                         metrics, y_names, rset_info, object)
+      out <- tune::new_iteration_results(
+        unsummarized, param_info,
+        metrics, y_names, rset_info, object
+      )
       return(out)
     })
 
@@ -349,13 +362,14 @@ tune_sim_anneal_workflow <-
     )
 
     for (i in (existing_iter + 1):iter) {
-
       new_grid <-
-        new_in_neighborhood(current_param,
-                            hist_values = grid_history,
-                            param_info,
-                            radius = control$radius,
-                            flip = control$flip) %>%
+        new_in_neighborhood(
+          current_param,
+          hist_values = grid_history,
+          param_info,
+          radius = control$radius,
+          flip = control$flip
+        ) %>%
         dplyr::mutate(
           .config = paste0("iter", i),
           .parent = current_parent
@@ -424,9 +438,8 @@ tune_sim_anneal_workflow <-
           parameters = param_info,
           metrics = metrics,
           outcomes = y_names,
-          rset_info =  rset_info,
+          rset_info = rset_info,
           workflow = object
-
         )
 
       ## -----------------------------------------------------------------------------

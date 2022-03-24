@@ -58,6 +58,7 @@
 #'
 #'   If `NULL`, chooses `"resamples"` if there are more than one resample,
 #'   otherwise chooses `"everything"` to attempt to maximize core utilization.
+#' @return An object of class `control_sim_anneal` that echos the argument values.
 #' @examples
 #' control_sim_anneal()
 #' @export
@@ -66,7 +67,7 @@ control_sim_anneal <-
            no_improve = Inf,
            restart = 8L,
            radius = c(0.05, 0.15),
-           flip = 3/4,
+           flip = 3 / 4,
            cooling_coef = 0.02,
            extract = NULL,
            save_pred = FALSE,
@@ -76,7 +77,6 @@ control_sim_anneal <-
            save_history = FALSE,
            event_level = "first",
            parallel_over = NULL) {
-
     tune::val_class_and_single(verbose, "logical", "control_sim_anneal()")
     tune::val_class_and_single(save_pred, "logical", "control_sim_anneal()")
     tune::val_class_and_single(no_improve, c("numeric", "integer"), "control_sim_anneal()")
@@ -131,7 +131,6 @@ control_sim_anneal <-
         save_history = save_history,
         event_level = event_level,
         parallel_over = parallel_over
-
       )
 
     class(res) <- "control_sim_anneal"

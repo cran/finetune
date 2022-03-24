@@ -54,6 +54,10 @@ parameter sets to be created automatically.}
 \item{control}{An object used to modify the tuning process. See
 \code{\link[=control_race]{control_race()}} for more details.}
 }
+\value{
+An object with primary class \code{tune_race} in the same standard format
+as objects produced by \code{\link[tune:tune_grid]{tune::tune_grid()}}.
+}
 \description{
 \code{\link[=tune_race_anova]{tune_race_anova()}} computes a set of performance metrics (e.g. accuracy or RMSE)
 for a pre-defined set of tuning parameters that correspond to a model or
@@ -195,35 +199,37 @@ tuning parameters, and so on.
 \donttest{
 library(parsnip)
 library(rsample)
-library(discrim)
 library(dials)
 
 ## -----------------------------------------------------------------------------
 
-data(two_class_dat, package = "modeldata")
+if (rlang::is_installed(c("discrim", "lme4", "modeldata"))) {
+  library(discrim)
+  data(two_class_dat, package = "modeldata")
 
-set.seed(6376)
-rs <- bootstraps(two_class_dat, times = 10)
+  set.seed(6376)
+  rs <- bootstraps(two_class_dat, times = 10)
 
-## -----------------------------------------------------------------------------
+  ## -----------------------------------------------------------------------------
 
-# optimize an regularized discriminant analysis model
-rda_spec <-
-  discrim_regularized(frac_common_cov = tune(), frac_identity = tune()) \%>\%
-  set_engine("klaR")
+  # optimize an regularized discriminant analysis model
+  rda_spec <-
+    discrim_regularized(frac_common_cov = tune(), frac_identity = tune()) \%>\%
+    set_engine("klaR")
 
-## -----------------------------------------------------------------------------
+  ## -----------------------------------------------------------------------------
 
-ctrl <- control_race(verbose_elim = TRUE)
-set.seed(11)
-grid_anova <-
-  rda_spec \%>\%
+  ctrl <- control_race(verbose_elim = TRUE)
+  set.seed(11)
+  grid_anova <-
+    rda_spec \%>\%
     tune_race_anova(Class ~ ., resamples = rs, grid = 10, control = ctrl)
 
-# Shows only the fully resampled parameters
-show_best(grid_anova, metric = "roc_auc", n = 2)
+  # Shows only the fully resampled parameters
+  show_best(grid_anova, metric = "roc_auc", n = 2)
 
-plot_race(grid_anova)
+  plot_race(grid_anova)
+}
 }
 }
 \references{
