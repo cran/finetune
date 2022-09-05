@@ -1,3 +1,9 @@
+# finetune 1.0.0
+
+* An informative error is given when there are not enough resamples for racing (#33).
+
+* `tune_sim_anneal()` was not passing all arguments to `tune_grid()` (#40). 
+
 # finetune 0.2.0
 
 * Maintenance release for CRAN requirements. 

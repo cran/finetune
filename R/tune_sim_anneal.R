@@ -274,6 +274,9 @@ tune_sim_anneal_workflow <-
     start_time <- proc.time()[3]
     cols <- tune::get_tune_colors()
 
+    # ------------------------------------------------------------------------------
+    # Check various inputs
+
     tune::check_rset(resamples)
     rset_info <- tune::pull_rset_attributes(resamples)
 
@@ -284,10 +287,24 @@ tune_sim_anneal_workflow <-
     if (is.null(param_info)) {
       param_info <- extract_parameter_set_dials(object)
     }
-    tune::check_workflow(object, check_dials = is.null(param_info), pset = param_info)
+
+    # In case mtry or other parameters with missing ranges need finalization
+    # param_info <- tune::check_parameters(
+    #   workflow = object,
+    #   pset = param_info,
+    #   data = resamples$splits[[1]]$data,
+    #   grid_names = param_info$id
+    # )
+
+    tune::check_workflow(object, check_dials = !is.null(param_info), pset = param_info)
+
+    # ------------------------------------------------------------------------------
+    # Chech or generate initial results
+
 
     control_init <- control
     control_init$save_workflow <- TRUE
+    control_init$verbose <- FALSE
     initial <- tune::check_initial(initial, param_info, object, resamples, metrics, control_init)
     if (any(dials::has_unknowns(param_info$object))) {
       param_info <- tune::.get_tune_parameters(initial)
@@ -381,7 +398,8 @@ tune_sim_anneal_workflow <-
         tune::tune_grid(
           resamples = resamples,
           grid = new_grid %>% dplyr::select(-.config, -.parent),
-          metrics = metrics
+          metrics = metrics,
+          control = control_init
         ) %>%
         dplyr::mutate(.iter = i) %>%
         update_config(config = paste0("Iter", i))
