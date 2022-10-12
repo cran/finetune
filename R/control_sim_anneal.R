@@ -1,5 +1,9 @@
 #' Control aspects of the simulated annealing search process
 #' @inheritParams tune::control_grid
+#' @param verbose_iter A logical for logging results of the search
+#'   process. Defaults to FALSE. If using a dark IDE theme, some logging
+#'   messages might be hard to see; try setting the `tidymodels.dark` option
+#'   with `options(tidymodels.dark = TRUE)` to print lighter colors.
 #' @param no_improve The integer cutoff for the number of iterations without
 #'   better results.
 #' @param restart The number of iterations with no improvement before new tuning
@@ -27,7 +31,8 @@
 #' control_sim_anneal()
 #' @export
 control_sim_anneal <-
-  function(verbose = TRUE,
+  function(verbose = FALSE,
+           verbose_iter = TRUE,
            no_improve = Inf,
            restart = 8L,
            radius = c(0.05, 0.15),
@@ -41,8 +46,14 @@ control_sim_anneal <-
            save_history = FALSE,
            event_level = "first",
            parallel_over = NULL,
-           allow_par = TRUE) {
+           allow_par = TRUE,
+           backend_options = NULL) {
+    # Any added arguments should also be added in superset control functions
+    # in other package. In other words, if tune_grid adds an option, the same
+    # object should be added here (regardless)
+
     tune::val_class_and_single(verbose, "logical", "control_sim_anneal()")
+    tune::val_class_and_single(verbose_iter, "logical", "control_sim_anneal()")
     tune::val_class_and_single(save_pred, "logical", "control_sim_anneal()")
     tune::val_class_and_single(no_improve, c("numeric", "integer"), "control_sim_anneal()")
     tune::val_class_and_single(restart, c("numeric", "integer"), "control_sim_anneal()")
@@ -85,6 +96,7 @@ control_sim_anneal <-
     res <-
       list(
         verbose = verbose,
+        verbose_iter = verbose_iter,
         no_improve = no_improve,
         restart = restart,
         radius = radius,
@@ -98,7 +110,8 @@ control_sim_anneal <-
         save_history = save_history,
         event_level = event_level,
         parallel_over = parallel_over,
-        allow_par = allow_par
+        allow_par = allow_par,
+        backend_options = backend_options
       )
 
     class(res) <- "control_sim_anneal"

@@ -179,6 +179,8 @@ tune_sim_anneal.recipe <- function(object,
                                    control = control_sim_anneal()) {
   tune::empty_ellipses(...)
 
+  control <- parsnip::condense_control(control, control_sim_anneal())
+
   tune_sim_anneal(
     model,
     preprocessor = object, resamples = resamples,
@@ -198,6 +200,8 @@ tune_sim_anneal.formula <- function(formula,
                                     initial = 1,
                                     control = control_sim_anneal()) {
   tune::empty_ellipses(...)
+
+  control <- parsnip::condense_control(control, control_sim_anneal())
 
   tune_sim_anneal(
     model,
@@ -226,6 +230,8 @@ tune_sim_anneal.model_spec <- function(object,
   }
 
   tune::empty_ellipses(...)
+
+  control <- parsnip::condense_control(control, control_sim_anneal())
 
   wflow <- workflows::add_model(workflows::workflow(), object)
 
@@ -256,6 +262,8 @@ tune_sim_anneal.workflow <-
            initial = 1,
            control = control_sim_anneal()) {
     tune::empty_ellipses(...)
+
+    control <- parsnip::condense_control(control, control_sim_anneal())
 
     tune_sim_anneal_workflow(
       object,
@@ -302,9 +310,8 @@ tune_sim_anneal_workflow <-
     # Chech or generate initial results
 
 
-    control_init <- control
+    control_init <- parsnip::condense_control(control, tune::control_grid())
     control_init$save_workflow <- TRUE
-    control_init$verbose <- FALSE
     initial <- tune::check_initial(initial, param_info, object, resamples, metrics, control_init)
     if (any(dials::has_unknowns(param_info$object))) {
       param_info <- tune::.get_tune_parameters(initial)
@@ -330,7 +337,7 @@ tune_sim_anneal_workflow <-
 
     i <- max(unsummarized$.iter) # In case things fail before iteration.
     iter <- iter + i
-    if (i > 0 && control$verbose) {
+    if (i > 0 && control$verbose_iter) {
       rlang::inform(cols$message$info("There were ", i, " previous iterations"))
     }
 
@@ -346,7 +353,7 @@ tune_sim_anneal_workflow <-
     })
 
     cols <- tune::get_tune_colors()
-    if (control$verbose) {
+    if (control$verbose_iter) {
       rlang::inform(cols$message$info(paste("Optimizing", metrics_name)))
     }
 

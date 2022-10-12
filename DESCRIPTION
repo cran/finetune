@@ -1,6 +1,6 @@
 Package: finetune
 Title: Additional Functions for Model Tuning
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: c(
     person("Max", "Kuhn", , "max@rstudio.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-2402-136X")),
@@ -17,21 +17,22 @@ License: MIT + file LICENSE
 URL: https://github.com/tidymodels/finetune,
         https://finetune.tidymodels.org
 BugReports: https://github.com/tidymodels/finetune/issues
-Depends: R (>= 3.4), tune (>= 0.2.0)
-Imports: cli, dials (>= 0.1.0), dplyr, ggplot2, purrr, rlang, tibble,
-        tidyr, tidyselect, utils, workflows (>= 0.2.6)
-Suggests: BradleyTerry2, covr, discrim, klaR, lme4, modeldata, parsnip
-        (>= 0.2.1), ranger, recipes (>= 0.2.0), rpart, rsample,
-        spelling, testthat, yardstick
+Depends: R (>= 3.4), tune (>= 1.0.1)
+Imports: cli, dials (>= 0.1.0), dplyr, ggplot2, parsnip (>= 1.0.2),
+        purrr, rlang, tibble, tidyr, tidyselect, utils, workflows (>=
+        0.2.6), vctrs
+Suggests: BradleyTerry2, covr, discrim, kknn, klaR, lme4, modeldata,
+        ranger, recipes (>= 0.2.0), rpart, rsample, spelling, testthat,
+        yardstick
 Config/Needs/website: tidyverse/tidytemplate
 Config/testthat/edition: 3
 Encoding: UTF-8
 Language: en-US
 RoxygenNote: 7.2.1.9000
 NeedsCompilation: no
-Packaged: 2022-09-05 22:50:14 UTC; max
+Packaged: 2022-10-12 02:20:52 UTC; max
 Author: Max Kuhn [aut, cre] (<https://orcid.org/0000-0003-2402-136X>),
   RStudio [cph, fnd]
 Maintainer: Max Kuhn <max@rstudio.com>
 Repository: CRAN
-Date/Publication: 2022-09-05 23:20:03 UTC
+Date/Publication: 2022-10-12 06:22:24 UTC

@@ -12,7 +12,7 @@ test_that("formula interface", {
   })
 
   expect_equal(class(res), c("tune_race", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 10)
+  expect_true(nrow(collect_metrics(res)) == 10) # this run has no elmimination
 })
 
 # ------------------------------------------------------------------------------
@@ -28,7 +28,7 @@ test_that("recipe interface", {
       )
   })
   expect_equal(class(res), c("tune_race", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 10)
+  expect_true(nrow(collect_metrics(res)) < 10)
 })
 
 # ------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ test_that("variable interface", {
       )
   })
   expect_equal(class(res), c("tune_race", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 10)
+  expect_true(nrow(collect_metrics(res)) == 10) # no elimination
 })
 
 # ------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ test_that("one player is really bad", {
     )
 
   set.seed(121)
-  df_folds <- vfold_cv(df, strata = .data$y)
+  df_folds <- vfold_cv(df, strata = y)
 
   rf_spec <-
     rand_forest(min_n = tune(), trees = 10) %>%

@@ -124,6 +124,8 @@ tune_race_win_loss.recipe <- function(object, model, resamples, ..., param_info 
                                       grid = 10, metrics = NULL, control = control_race()) {
   tune::empty_ellipses(...)
 
+  control <- parsnip::condense_control(control, control_race())
+
   tune_race_win_loss(
     model,
     preprocessor = object, resamples = resamples,
@@ -136,6 +138,8 @@ tune_race_win_loss.recipe <- function(object, model, resamples, ..., param_info 
 tune_race_win_loss.formula <- function(formula, model, resamples, ..., param_info = NULL,
                                        grid = 10, metrics = NULL, control = control_race()) {
   tune::empty_ellipses(...)
+
+  control <- parsnip::condense_control(control, control_race())
 
   tune_race_win_loss(
     model,
@@ -158,6 +162,8 @@ tune_race_win_loss.model_spec <- function(object, preprocessor, resamples, ...,
   }
 
   tune::empty_ellipses(...)
+
+  control <- parsnip::condense_control(control, control_race())
 
   wflow <- workflows::add_model(workflows::workflow(), object)
 
@@ -183,6 +189,8 @@ tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NUL
                                         grid = 10, metrics = NULL,
                                         control = control_race()) {
   tune::empty_ellipses(...)
+
+  control <- parsnip::condense_control(control, control_race())
 
   tune_race_win_loss_workflow(
     object,
@@ -211,6 +219,7 @@ tune_race_win_loss_workflow <-
     check_num_resamples(B, min_rs)
     tmp_resamples <- restore_rset(resamples, 1:min_rs)
 
+    grid_control <- parsnip::condense_control(control, tune::control_grid())
     res <-
       object %>%
       tune::tune_grid(
@@ -218,7 +227,7 @@ tune_race_win_loss_workflow <-
         param_info = param_info,
         grid = grid,
         metrics = metrics,
-        control = control
+        control = grid_control
       )
 
     param_names <- tune::.get_tune_parameter_names(res)
@@ -265,6 +274,7 @@ tune_race_win_loss_workflow <-
         log_final <- FALSE
       }
 
+      grid_control <- parsnip::condense_control(control, tune::control_grid())
       tmp_res <-
         object %>%
         tune::tune_grid(
@@ -272,7 +282,7 @@ tune_race_win_loss_workflow <-
           param_info = param_info,
           grid = new_grid,
           metrics = metrics,
-          control = control
+          control = grid_control
         )
       res <- restore_tune(res, tmp_res)
 
