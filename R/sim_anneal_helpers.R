@@ -334,7 +334,7 @@ log_sa_progress <- function(control = list(verbose_iter = TRUE), x, metric, max_
     msg <- paste0("Initial best: ", sprintf(dig, signif(initial_res, digits = digits)))
   }
 
-  rlang::inform(cols$message$info(msg))
+  cli::cli_bullets(cols$message$info(msg))
 }
 
 format_event <- function(x) {
@@ -349,6 +349,7 @@ format_event <- function(x) {
   ) %>%
     dplyr::mutate(
       new = format(orig, justify = "left"),
+      new = gsub(" ", "\u00a0", new, fixed = TRUE),
       result = paste(symb, new)
     )
   color_event(result_key$result[result_key$orig == x])
@@ -383,19 +384,33 @@ get_outcome_names <- function(x, rs) {
   res
 }
 
-update_config <- function(x, prefix = NULL, config = "new") {
+update_config <- function(x, prefix = NULL, config = "new", save_pred) {
   if (!is.null(prefix)) {
     x$.metrics <-
       purrr::map(
         x$.metrics,
         ~ dplyr::mutate(.x, .config = paste0(prefix, "_", .config))
       )
+    if (save_pred) {
+      x$.predictions <-
+        purrr::map(
+          x$.predictions,
+          ~ dplyr::mutate(.x, .config = paste0(prefix, "_", .config))
+        )
+    }
   } else {
     x$.metrics <-
       purrr::map(
         x$.metrics,
         ~ dplyr::mutate(.x, .config = config)
       )
+    if (save_pred) {
+      x$.predictions <-
+        purrr::map(
+          x$.predictions,
+          ~ dplyr::mutate(.x, .config = config)
+        )
+    }
   }
   x
 }

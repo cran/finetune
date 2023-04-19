@@ -198,6 +198,8 @@ tune_race_anova_workflow <-
            control = control_race()) {
     rlang::check_installed("lme4")
 
+    tune::initialize_catalog(control = control)
+
     B <- nrow(resamples)
     if (control$randomize) {
       resamples <- randomize_resamples(resamples)
@@ -292,6 +294,8 @@ tune_race_anova_workflow <-
         }
       }
     }
+
+    .stash_last_result(res)
 
     res
   }

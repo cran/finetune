@@ -241,6 +241,8 @@ tune_sim_anneal.model_spec <- function(object,
     wflow <- workflows::add_formula(wflow, preprocessor)
   }
 
+  tune::initialize_catalog(control = control)
+
   tune_sim_anneal_workflow(
     wflow,
     resamples = resamples, iter = iter,
@@ -264,6 +266,8 @@ tune_sim_anneal.workflow <-
     tune::empty_ellipses(...)
 
     control <- parsnip::condense_control(control, control_sim_anneal())
+
+    tune::initialize_catalog(control = control)
 
     tune_sim_anneal_workflow(
       object,
@@ -329,7 +333,7 @@ tune_sim_anneal_workflow <-
         rset_info = rset_info,
         workflow = object
       ) %>%
-      update_config(prefix = "initial")
+      update_config(prefix = "initial", save_pred = control$save_pred)
 
     mean_stats <- tune::estimate_tune_results(unsummarized)
 
@@ -349,12 +353,13 @@ tune_sim_anneal_workflow <-
         unsummarized, param_info,
         metrics, y_names, rset_info, object
       )
+      .stash_last_result(out)
       return(out)
     })
 
     cols <- tune::get_tune_colors()
     if (control$verbose_iter) {
-      rlang::inform(cols$message$info(paste("Optimizing", metrics_name)))
+      cli::cli_bullets(cols$message$info(paste("Optimizing", metrics_name)))
     }
 
     ## -----------------------------------------------------------------------------
@@ -409,7 +414,7 @@ tune_sim_anneal_workflow <-
           control = control_init
         ) %>%
         dplyr::mutate(.iter = i) %>%
-        update_config(config = paste0("Iter", i))
+        update_config(config = paste0("Iter", i), save_pred = control$save_pred)
 
       result_history <-
         result_history %>%
@@ -494,6 +499,9 @@ tune_sim_anneal_workflow <-
         dplyr::arrange(.iter, .config)
       save(result_history, file = file.path(tempdir(), "sa_history.RData"))
     }
+
+    .stash_last_result(unsummarized)
+
     # Note; this line is probably not executed due to on.exit():
     unsummarized
   }
