@@ -9,8 +9,10 @@ test_that("formula interface", {
       )
   })
   expect_equal(class(res), c("iteration_results", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 6)
+  expect_true(nrow(collect_metrics(res)) == 9)
   expect_equal(res, .Last.tune.result)
+  expect_null(.get_tune_eval_times(res))
+  expect_null(.get_tune_eval_time_target(res))
 })
 
 # ------------------------------------------------------------------------------
@@ -30,7 +32,7 @@ test_that("recipe interface", {
   })
 
   expect_equal(class(res), c("iteration_results", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 6)
+  expect_true(nrow(collect_metrics(res)) == 9)
   expect_equal(res, .Last.tune.result)
 })
 
@@ -47,7 +49,7 @@ test_that("variable interface", {
       )
   })
   expect_equal(class(res), c("iteration_results", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 6)
+  expect_true(nrow(collect_metrics(res)) == 9)
   expect_equal(res, .Last.tune.result)
 
   # Check to see if iterations are picked up when an iterative object is used
@@ -61,9 +63,9 @@ test_that("variable interface", {
                       control = control_sim_anneal(verbose = FALSE)
       )
   })
-  expect_true(nrow(collect_metrics(new_res)) == 10)
+  expect_true(nrow(collect_metrics(new_res)) == 15)
   expect_true(max(new_res$.iter) == 4)
-  expect_true(sum(grepl("^initial", collect_metrics(new_res)$.config)) == 6)
+  expect_true(sum(grepl("^initial", collect_metrics(new_res)$.config)) == 9)
   expect_equal(new_res, .Last.tune.result)
 
   # but not for non-iterative objects
@@ -79,9 +81,9 @@ test_that("variable interface", {
                       control = control_sim_anneal(verbose = FALSE)
       )
   })
-  expect_true(nrow(collect_metrics(new_new_res)) == 8)
+  expect_true(nrow(collect_metrics(new_new_res)) == 12)
   expect_true(max(new_new_res$.iter) == 2)
-  expect_true(sum(grepl("^initial", collect_metrics(new_new_res)$.config)) == 4)
+  expect_true(sum(grepl("^initial", collect_metrics(new_new_res)$.config)) == 6)
   expect_equal(new_new_res, .Last.tune.result)
 })
 
@@ -99,7 +101,7 @@ test_that("unfinalized parameters", {
   rec_example <- recipe(Class ~ ., data = two_class_dat)
 
   # RF
-  model_rf <- rand_forest(min_n = tune()) %>%
+  model_rf <- rand_forest(mtry = tune()) %>%
     set_mode("classification") %>%
     set_engine("ranger")
 
@@ -115,6 +117,63 @@ test_that("unfinalized parameters", {
     set.seed(40)
     rf_res_finetune <- wf_rf %>%
       tune_sim_anneal(resamples = bt, initial = rf_res)
+  })
+
+  # don't supply an initial grid (#39)
+  expect_snapshot({
+    set.seed(40)
+    rf_res_finetune <- wf_rf %>%
+      tune_sim_anneal(resamples = bt)
+  })
+})
+
+test_that("incompatible parameter objects", {
+  skip_on_cran()
+
+  skip_if_not_installed("ranger")
+  skip_if_not_installed("modeldata")
+  skip_if_not_installed("rsample")
+
+  rf_spec <- parsnip::rand_forest(mode = "regression", mtry = tune::tune())
+
+  set.seed(1)
+  grid_with_bigger_range <-
+    dials::grid_latin_hypercube(dials::mtry(range = c(1, 16)))
+
+  set.seed(1)
+  car_folds <- rsample::vfold_cv(car_prices, v = 2)
+
+  car_wflow <- workflows::workflow() %>%
+    workflows::add_formula(Price ~ .) %>%
+    workflows::add_model(rf_spec)
+
+  set.seed(1)
+  tune_res_with_bigger_range <- tune::tune_grid(
+    car_wflow,
+    resamples = car_folds,
+    grid = grid_with_bigger_range
+  )
+
+  set.seed(1)
+  parameter_set_with_smaller_range <-
+    dials::parameters(dials::mtry(range = c(1, 5)))
+
+  scrub_best <- function(lines) {
+    has_best <- grepl("Initial best", lines)
+    lines[has_best] <- ""
+    lines
+  }
+
+  set.seed(1)
+  expect_snapshot(error = TRUE, transform = scrub_best, {
+    res <-
+      tune_sim_anneal(
+        car_wflow,
+        param_info = parameter_set_with_smaller_range,
+        resamples = car_folds,
+        initial = tune_res_with_bigger_range,
+        iter = 2
+      )
   })
 })
 

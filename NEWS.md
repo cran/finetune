@@ -1,8 +1,34 @@
+# finetune 1.2.0
+
+## New Features
+
+* finetune now fully supports models in the "censored regression" mode. These models can be fit, tuned, and evaluated like the regression and classification modes. [tidymodels.org](https://www.tidymodels.org/learn/#category=survival%20analysis) has more information and tutorials on how to work with survival analysis models.
+
+* Improved error message from `tune_sim_anneal()` when values in the supplied `param_info` do not encompass all values evaluated in the `initial` grid. This most often happens when a user mistakenly supplies different parameter sets to the function that generated the initial results and `tune_sim_anneal()`.
+
+* `autoplot()` methods for racing objects will now use integers in x-axis breaks (#75).
+
+* Enabling the `verbose_elim` control option for `tune_race_anova()` will now additionally introduce a message confirming that the function is evaluating against the burn-in resamples.
+
+* Updates based on the new version of tune, primarily for survival analysis models (#104). 
+
+## Bug Fixes
+
+* Fixed bug where `tune_sim_anneal()` would fail when supplied parameters needing finalization. The function will now finalize needed parameter ranges internally (#39).
+
+* Fixed bug where packages specified in `control_race(pkgs)` were not actually loaded in `tune_race_anova()` (#74).
+
+## Breaking Change
+
+* Ellipses (...) are now used consistently in the package to require optional arguments to be named. `collect_predictions()`, `collect_metrics()` and `show_best()` methods previously had ellipses at the end of the function signature  that have been moved to follow the last argument without a default value. Optional arguments previously passed by position will now error informatively prompting them to be named (#105).
+
 # finetune 1.1.0
 
 * Various minor changes to keep up with developments in the tune and dplyr packages (#60) (#62) (#67) (#68). 
 
 * Corrects `.config` output with `save_pred = TRUE` in `tune_sim_anneal()`. The function previously outputted a constant `Model1_Preprocessor1` in the `.predictions` slot, and now provides `.config` values that align with those in `.metrics` (#57).
+
+* An `eval_time` attribute was added to tune objects produced by finetune. 
 
 # finetune 1.0.1
 

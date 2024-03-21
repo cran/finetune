@@ -9,29 +9,17 @@
 #'  statistics are calculated and a logistic regression model is used to measure
 #'  how likely each combination is to win overall.
 #'
-#' @param object A `parsnip` model specification or a [workflows::workflow()].
-#' @param preprocessor A traditional model formula or a recipe created using
-#'   [recipes::recipe()].
-#' @param resamples An `rset()` object that has multiple resamples (i.e., is not
-#'  a validation set).
-#' @param param_info A [dials::parameters()] object or `NULL`. If none is given,
-#' a parameters set is derived from other arguments. Passing this argument can
-#' be useful when parameter ranges need to be customized.
-#' @param grid A data frame of tuning combinations or a positive integer. The
-#'  data frame should have columns for each parameter being tuned and rows for
-#'  tuning parameter candidates. An integer denotes the number of candidate
-#'  parameter sets to be created automatically.
-#' @param metrics A [yardstick::metric_set()] or `NULL`.
-#' @param control An object used to modify the tuning process.
+#' @inheritParams tune_race_anova
 #' @references
 #' Kuhn, M 2014. "Futility Analysis in the Cross-Validation of Machine Learning
 #' Models." \url{https://arxiv.org/abs/1405.6974}.
 #' @param ... Not currently used.
+#' @details
 #' The technical details of this method are described in Kuhn (2014).
 #'
 #' Racing methods are efficient approaches to grid search. Initially, the
 #'  function evaluates all tuning parameters on a small initial set of
-#'  resamples. The `burn_in` argument of `control_race()` sets the number of
+#'  resamples. The `burn_in` argument of [control_race()] sets the number of
 #'  initial resamples.
 #'
 #' The performance statistics from the current set of resamples are converted
@@ -63,8 +51,19 @@
 #'  statistical analysis is updated. More candidate parameters may be excluded
 #'  with each new resample that is processed.
 #'
-#' The `control_race()` function contains are parameter for the significance cutoff
+#' The [control_race()] function contains are parameter for the significance cutoff
 #'  applied to the Bradley-Terry model results as well as other relevant arguments.
+#'
+#' ## Censored regression models
+#'
+#' With dynamic performance metrics (e.g. Brier or ROC curves), performance is
+#' calculated for every value of `eval_time` but the _first_ evaluation time
+#' given by the user (e.g., `eval_time[1]`) is analyzed during racing.
+#'
+#' Also, values of `eval_time` should be less than the largest observed event
+#' time in the training data. For many non-parametric models, the results beyond
+#' the largest time corresponding to an event are constant (or `NA`).
+#'
 #' @examples
 #' \donttest{
 #' library(parsnip)
@@ -113,80 +112,114 @@ tune_race_win_loss <- function(object, ...) {
 #' @export
 tune_race_win_loss.default <- function(object, ...) {
   msg <- paste0(
-    "The first argument to [tune_race_win_loss()] should be either ",
+    "The first argument to {.fn tune_race_win_loss} should be either ",
     "a model or workflow."
   )
-  rlang::abort(msg)
+  cli::cli_abort(msg)
 }
 
 #' @export
-tune_race_win_loss.recipe <- function(object, model, resamples, ..., param_info = NULL,
-                                      grid = 10, metrics = NULL, control = control_race()) {
-  tune::empty_ellipses(...)
+tune_race_win_loss.recipe <-
+  function(object,
+           model,
+           resamples,
+           ...,
+           param_info = NULL,
+           grid = 10,
+           metrics = NULL,
+           eval_time = NULL,
+           control = control_race()) {
+    tune::empty_ellipses(...)
 
-  control <- parsnip::condense_control(control, control_race())
+    control <- parsnip::condense_control(control, control_race())
 
-  tune_race_win_loss(
-    model,
-    preprocessor = object, resamples = resamples,
-    param_info = param_info, grid = grid,
-    metrics = metrics, control = control
-  )
-}
+    tune_race_win_loss(
+      model,
+      preprocessor = object, resamples = resamples,
+      param_info = param_info, grid = grid,
+      metrics = metrics, control = control,
+      eval_time = eval_time
+    )
+  }
 
 #' @export
-tune_race_win_loss.formula <- function(formula, model, resamples, ..., param_info = NULL,
-                                       grid = 10, metrics = NULL, control = control_race()) {
-  tune::empty_ellipses(...)
+tune_race_win_loss.formula <-
+  function(formula,
+           model,
+           resamples,
+           ...,
+           param_info = NULL,
+           grid = 10,
+           metrics = NULL,
+           eval_time = NULL,
+           control = control_race()) {
+    tune::empty_ellipses(...)
 
-  control <- parsnip::condense_control(control, control_race())
+    control <- parsnip::condense_control(control, control_race())
 
-  tune_race_win_loss(
-    model,
-    preprocessor = formula, resamples = resamples,
-    param_info = param_info, grid = grid,
-    metrics = metrics, control = control
-  )
-}
+    tune_race_win_loss(
+      model,
+      preprocessor = formula,
+      resamples = resamples,
+      param_info = param_info,
+      grid = grid,
+      metrics = metrics,
+      eval_time = eval_time,
+      control = control
+    )
+  }
 
 #' @export
 #' @rdname tune_race_win_loss
-tune_race_win_loss.model_spec <- function(object, preprocessor, resamples, ...,
-                                          param_info = NULL, grid = 10, metrics = NULL,
-                                          control = control_race()) {
-  if (rlang::is_missing(preprocessor) || !tune::is_preprocessor(preprocessor)) {
-    rlang::abort(paste(
-      "To tune a model spec, you must preprocess",
-      "with a formula, recipe, or variable specification"
-    ))
+tune_race_win_loss.model_spec <-
+  function(object,
+           preprocessor,
+           resamples,
+           ...,
+           param_info = NULL,
+           grid = 10,
+           metrics = NULL,
+           eval_time = NULL,
+           control = control_race()) {
+    if (rlang::is_missing(preprocessor) || !tune::is_preprocessor(preprocessor)) {
+      cli::cli_abort(
+        "To tune a model spec, you must preprocess with a formula, recipe, \\
+        or variable specification."
+      )
+    }
+
+    tune::empty_ellipses(...)
+
+    control <- parsnip::condense_control(control, control_race())
+
+    wflow <- workflows::add_model(workflows::workflow(), object)
+
+    if (tune::is_recipe(preprocessor)) {
+      wflow <- workflows::add_recipe(wflow, preprocessor)
+    } else if (rlang::is_formula(preprocessor)) {
+      wflow <- workflows::add_formula(wflow, preprocessor)
+    }
+
+    tune_race_win_loss_workflow(
+      wflow,
+      resamples = resamples,
+      grid = grid,
+      metrics = metrics,
+      eval_time = eval_time,
+      param_info = param_info,
+      control = control
+    )
   }
-
-  tune::empty_ellipses(...)
-
-  control <- parsnip::condense_control(control, control_race())
-
-  wflow <- workflows::add_model(workflows::workflow(), object)
-
-  if (tune::is_recipe(preprocessor)) {
-    wflow <- workflows::add_recipe(wflow, preprocessor)
-  } else if (rlang::is_formula(preprocessor)) {
-    wflow <- workflows::add_formula(wflow, preprocessor)
-  }
-
-  tune_race_win_loss_workflow(
-    wflow,
-    resamples = resamples,
-    grid = grid,
-    metrics = metrics,
-    param_info = param_info,
-    control = control
-  )
-}
 
 #' @export
 #' @rdname tune_race_win_loss
-tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NULL,
-                                        grid = 10, metrics = NULL,
+tune_race_win_loss.workflow <- function(object,
+                                        resamples,
+                                        ...,
+                                        param_info = NULL,
+                                        grid = 10,
+                                        metrics = NULL,
+                                        eval_time = NULL,
                                         control = control_race()) {
   tune::empty_ellipses(...)
 
@@ -197,6 +230,7 @@ tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NUL
     resamples = resamples,
     grid = grid,
     metrics = metrics,
+    eval_time = eval_time,
     param_info = param_info,
     control = control
   )
@@ -205,8 +239,14 @@ tune_race_win_loss.workflow <- function(object, resamples, ..., param_info = NUL
 ## -----------------------------------------------------------------------------
 
 tune_race_win_loss_workflow <-
-  function(object, resamples, param_info = NULL, grid = 10, metrics = NULL,
-           control = control_race()) {
+  function(object,
+           resamples,
+           param_info = NULL,
+           grid = 10,
+           metrics = NULL,
+           eval_time = NULL,
+           control = control_race(),
+           call = caller_env()) {
     rlang::check_installed("BradleyTerry2")
 
     B <- nrow(resamples)
@@ -219,6 +259,9 @@ tune_race_win_loss_workflow <-
     check_num_resamples(B, min_rs)
     tmp_resamples <- restore_rset(resamples, 1:min_rs)
 
+    metrics <- tune::check_metrics_arg(metrics, object, call = call)
+    eval_time <- tune::check_eval_time_arg(eval_time, metrics, call = call)
+
     grid_control <- parsnip::condense_control(control, tune::control_grid())
     res <-
       object %>%
@@ -227,29 +270,27 @@ tune_race_win_loss_workflow <-
         param_info = param_info,
         grid = grid,
         metrics = metrics,
+        eval_time = eval_time,
         control = grid_control
       )
 
     param_names <- tune::.get_tune_parameter_names(res)
-    metrics <- tune::.get_tune_metrics(res)
-    analysis_metric <- names(attr(metrics, "metrics"))[1]
-    analysis_max <- attr(attr(metrics, "metrics")[[1]], "direction") == "maximize"
 
-    cols <- tune::get_tune_colors()
-    if (control$verbose_elim) {
-      msg <-
-        paste(
-          "Racing will", ifelse(analysis_max, "maximize", "minimize"),
-          "the", analysis_metric, "metric."
-        )
-      rlang::inform(cols$message$info(paste0(cli::symbol$info, " ", msg)))
-      if (control$randomize) {
-        msg <- "Resamples are analyzed in a random order."
-        rlang::inform(cols$message$info(paste0(cli::symbol$info, " ", msg)))
-      }
-    }
 
-    filters_results <- test_parameters_bt(res, control$alpha)
+    opt_metric <- tune::first_metric(metrics)
+    opt_metric_name <- opt_metric$metric
+    maximize <- opt_metric$direction == "maximize"
+
+    opt_metric_time <- tune::first_eval_time(
+      metrics,
+      metric = opt_metric_name,
+      eval_time = eval_time,
+      call = call
+    )
+
+    racing_obj_log(opt_metric_name, opt_metric$direction, control, opt_metric_time)
+
+    filters_results <- test_parameters_bt(res, control$alpha, opt_metric_time)
     n_grid <- nrow(filters_results)
 
     log_final <- TRUE
@@ -265,11 +306,11 @@ tune_race_win_loss_workflow <-
 
       if (nrow(new_grid) > 1) {
         tmp_resamples <- restore_rset(resamples, rs)
-        log_racing(control, filters_results, res$splits, n_grid, analysis_metric)
+        log_racing(control, filters_results, res$splits, n_grid, opt_metric_name)
       } else {
         tmp_resamples <- restore_rset(resamples, rs:B)
         if (log_final) {
-          log_racing(control, filters_results, res$splits, n_grid, analysis_metric)
+          log_racing(control, filters_results, res$splits, n_grid, opt_metric_name)
         }
         log_final <- FALSE
       }
@@ -282,14 +323,15 @@ tune_race_win_loss_workflow <-
           param_info = param_info,
           grid = new_grid,
           metrics = metrics,
+          eval_time = eval_time,
           control = grid_control
         )
-      res <- restore_tune(res, tmp_res)
+      res <- restore_tune(res, tmp_res, opt_metric_time)
 
       if (nrow(new_grid) > 1) {
-        filters_results <- test_parameters_bt(res, control$alpha)
+        filters_results <- test_parameters_bt(res, control$alpha, opt_metric_time)
         if (sum(filters_results$pass) == 2 & num_ties >= control$num_ties) {
-          filters_results <- tie_breaker(res, control)
+          filters_results <- tie_breaker(res, control, eval_time = opt_metric_time)
         }
       } else {
         # Depending on the value of control$parallel_over we don't need to do

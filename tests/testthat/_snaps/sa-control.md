@@ -32,7 +32,7 @@
 
 ---
 
-    'no_improve' should be > 1
+    `no_improve` should be > 1.
 
 ---
 
@@ -44,20 +44,20 @@
 
 ---
 
-    'restart' should be > 1
+    `restart` should be > 1.
 
 ---
 
     Code
       control_sim_anneal(no_improve = 2, restart = 6)
-    Message <cliMessage>
+    Message
       ! Parameter restart is scheduled after 6 poor iterations but the search will stop after 2.
     Output
       Simulated annealing control object
 
 ---
 
-    Argument 'radius' should be two numeric values.
+    Argument `radius` should be two numeric values.
 
 ---
 

@@ -12,7 +12,7 @@ test_that("formula interface", {
   })
 
   expect_equal(class(res), c("tune_race", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 10) # this run has no elmimination
+  expect_true(nrow(collect_metrics(res)) == 15) # this run has no elimination
   expect_equal(res, .Last.tune.result)
 })
 
@@ -46,7 +46,7 @@ test_that("variable interface", {
       )
   })
   expect_equal(class(res), c("tune_race", "tune_results", "tbl_df", "tbl", "data.frame"))
-  expect_true(nrow(collect_metrics(res)) == 10) # no elimination
+  expect_true(nrow(collect_metrics(res)) == 15) # no elimination
   expect_equal(res, .Last.tune.result)
 })
 
@@ -88,7 +88,7 @@ test_that("one player is really bad", {
     control = ctrl
   )
 
-  # TODO Needs to be fixed in tune package
-  expect_true(nrow(show_best(tuning_results)) > 0)
+  expect_snapshot(best_res <- show_best(tuning_results))
+  expect_true(nrow(best_res) == 1)
 
 })

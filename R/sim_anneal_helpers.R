@@ -144,9 +144,28 @@ random_real_neighbor <- function(current, hist_values, pset, retain = 1,
 
 encode_set_backwards <- function(x, pset, ...) {
   pset <- pset[pset$id %in% names(x), ]
+  mapply(check_backwards_encode, pset$object, x, pset$id,
+         SIMPLIFY = FALSE, USE.NAMES = FALSE)
   new_vals <- purrr::map2(pset$object, x, dials::encode_unit, direction = "backward")
   names(new_vals) <- names(x)
   tibble::as_tibble(new_vals)
+}
+
+check_backwards_encode <- function(x, value, id) {
+  if (!dials::has_unknowns(x)) {
+    compl <- value[!is.na(value)]
+    if (any(compl < 0) | any(compl > 1)) {
+      cli::cli_abort(c(
+        "!" = "The range for parameter {.val {noquote(id)}} used when \\
+               generating initial results isn't compatible with the range \\
+               supplied in {.arg param_info}.",
+        "i" = "Possible values of parameters in {.arg param_info} should \\
+               encompass all values evaluated in the initial grid."
+        ),
+        call = rlang::call2("tune_sim_anneal()")
+      )
+    }
+  }
 }
 
 sample_by_distance <- function(candidates, existing, retain, pset) {
@@ -179,11 +198,10 @@ sample_by_distance <- function(candidates, existing, retain, pset) {
 
 ## -----------------------------------------------------------------------------
 
-update_history <- function(history, x, iter) {
+update_history <- function(history, x, iter, eval_time) {
   analysis_metric <- tune::.get_tune_metric_names(x)[1]
   res <-
-    tune::show_best(x, metric = analysis_metric) %>%
-    # dplyr::select(.metric, mean, n, std_err) %>%
+    tune::show_best(x, metric = analysis_metric, eval_time = eval_time) %>%
     dplyr::mutate(
       .config = paste0("iter", iter),
       .iter = iter,
@@ -251,11 +269,15 @@ sa_decide <- function(x, parent, metric, maximize, coef) {
   x
 }
 
-initialize_history <- function(x, ...) {
+initialize_history <- function(x, eval_time = NULL, ...) {
   # check to see if there is existing history
   res <-
     tune::collect_metrics(x) %>%
     dplyr::filter(.metric == tune::.get_tune_metric_names(x)[1])
+  if (!is.na(eval_time) && any(names(res) == ".eval_time")) {
+    res <- res %>% dplyr::filter(.eval_time == eval_time)
+  }
+
   if (!any(names(res) == ".iter")) {
     res$.iter <- 0
   }
@@ -272,6 +294,9 @@ initialize_history <- function(x, ...) {
 
 
 percent_diff <- function(current, new, maximize = TRUE) {
+  if (isTRUE(all.equal(current, new))) {
+    return(0.0)
+  }
   if (maximize) {
     pct_diff <- (new - current) / current
   } else {
@@ -376,7 +401,7 @@ get_outcome_names <- function(x, rs) {
       res <- tidyselect::eval_select(preproc$outcomes, data = dat)
       res <- names(res)
     } else {
-      rlang::abort("Cannot obtain the outcome name(s)")
+      cli::cli_abort("Cannot obtain the outcome name(s)")
     }
   } else {
     res <- outcome_names(x)

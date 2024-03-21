@@ -40,9 +40,9 @@ refactor_by_mean <- function(res, maximize = TRUE) {
   configs
 }
 
-test_parameters_gls <- function(x, alpha = 0.05) {
+test_parameters_gls <- function(x, alpha = 0.05, eval_time = NULL) {
   if (all(purrr::map_lgl(x$.metrics, is.null))) {
-    rlang::abort("There were no valid metrics for the ANOVA model.")
+    cli::cli_abort("There were no valid metrics for the ANOVA model.")
   }
   param_names <- tune::.get_tune_parameter_names(x)
   metric_data <- metric_tibble(x)
@@ -52,6 +52,10 @@ test_parameters_gls <- function(x, alpha = 0.05) {
   res <-
     tune::collect_metrics(x, summarize = FALSE) %>%
     dplyr::filter(.metric == metric)
+
+  if (!is.null(eval_time) && any(names(res) == ".eval_time")) {
+    res <- dplyr::filter(res, .eval_time == eval_time)
+  }
 
   key <-
     res %>%
@@ -109,7 +113,7 @@ test_parameters_gls <- function(x, alpha = 0.05) {
 ## -----------------------------------------------------------------------------
 # Racing via discrete competitions
 
-test_parameters_bt <- function(x, alpha = 0.05) {
+test_parameters_bt <- function(x, alpha = 0.05, eval_time = NULL) {
   param_names <- tune::.get_tune_parameter_names(x)
   metric_data <- metric_tibble(x)
   metric <- metric_data$metric[1]
@@ -118,6 +122,10 @@ test_parameters_bt <- function(x, alpha = 0.05) {
   res <-
     tune::collect_metrics(x, summarize = FALSE) %>%
     dplyr::filter(.metric == metric)
+
+  if (!is.null(eval_time) && any(names(res) == ".eval_time")) {
+    res <- dplyr::filter(res, .eval_time == eval_time)
+  }
 
   key <-
     res %>%
@@ -173,7 +181,6 @@ test_parameters_bt <- function(x, alpha = 0.05) {
     ) %>%
     dplyr::bind_rows(make_best_results(best_team))
 
-
   ## TODO For both racing methods, make this a function with the configs as
   ## arguments.
   if (length(season_data$eliminated) > 0) {
@@ -192,6 +199,7 @@ make_config_pairs <- function(x) {
   id_combin <- t(utils::combn(ids, 2))
   colnames(id_combin) <- c("p1", "p2")
   id_combin <- tibble::as_tibble(id_combin)
+  id_combin
 }
 
 score_match <- function(x, y, maximize) {
@@ -379,7 +387,18 @@ harmonize_configs <- function(x, key) {
   x
 }
 
-restore_tune <- function(x, y) {
+# restore_tune() restores certain attributes (esp class) that are lost during
+# racing when rows of the resampling object are filtered.
+# `x` has class `tune_results`. `y` has the same structure but different
+# attributes.
+# About eval_time_target: `x` is from `tune_grid()`, which has no notion of a
+# target evaluation time. https://github.com/tidymodels/tune/pull/782 defaults
+# `eval_time_target` to NULL for grid tuning, resampling, and last fit objects.
+# That's why `eval_time_target` is an argument to this function. It should be
+# non-null for the resulting racing object but the value inherited from `x` is
+# NULL unless we set it.
+
+restore_tune <- function(x, y, eval_time_target = NULL) {
   # With a smaller number of parameter combinations, the .config values may have
   # changed. We'll use the full set of parameters in `x` to adjust what is in
   # `y`.
@@ -391,6 +410,7 @@ restore_tune <- function(x, y) {
 
   att <- attributes(x)
   att$row.names <- 1:(nrow(x) + nrow(y))
+  att$eval_time_target <- eval_time_target
   att$class <- c("tune_race", "tune_results", class(tibble::tibble()))
 
 
@@ -440,16 +460,22 @@ log_racing <- function(control, x, splits, grid_size, metric) {
   cli::cli_bullets(msg)
 }
 
-
-tie_breaker <- function(res, control) {
+tie_breaker <- function(res, control, eval_time = NULL) {
   param_names <- tune::.get_tune_parameter_names(res)
   metrics <- tune::.get_tune_metrics(res)
   analysis_metric <- names(attr(metrics, "metrics"))[1]
   analysis_max <- attr(attr(metrics, "metrics")[[1]], "direction") == "maximize"
+  metrics_time <- eval_time[1]
+
   x <-
     res %>%
     tune::collect_metrics() %>%
     dplyr::filter(.metric == analysis_metric)
+
+  if (!is.null(metrics_time)) {
+    x <- dplyr::filter(x, .eval_time == metrics_time)
+  }
+
   all_config <- x$.config
   max_rs <- max(x$n)
   finalists <- x[x$n == max_rs, ]
@@ -460,7 +486,7 @@ tie_breaker <- function(res, control) {
     if (runif(1) < .05) {
       msg <- paste(msg, "Two models enter, one model leaves.")
     }
-    rlang::inform(msg)
+    cli::cli_inform(msg)
   }
   res <-
     dplyr::select(x, .config, !!!param_names) %>%
@@ -474,11 +500,20 @@ tie_breaker <- function(res, control) {
 }
 
 check_results <- function(dat, rm_zv = TRUE, rm_dup = FALSE) {
-  ids <- grep("^id", names(dat))
+  ids <- grep("^id", names(dat), value = TRUE)
+
+  if (any(names(dat) == ".eval_time")) {
+    dat$.eval_time <- NULL
+  }
+
   x <-
     dat %>%
     dplyr::select(!!!ids, .estimate, .config) %>%
-    tidyr::pivot_wider(id_cols = c(dplyr::all_of(ids)), names_from = c(.config), values_from = c(.estimate))
+    tidyr::pivot_wider(
+      id_cols = c(dplyr::all_of(ids)),
+      names_from = .config,
+      values_from = .estimate
+    )
 
   exclude <- character(0)
 
@@ -630,12 +665,13 @@ randomize_resamples <- function(x) {
 #' @name collect_predictions
 collect_predictions.tune_race <-
   function(x,
+           ...,
            summarize = FALSE,
            parameters = NULL,
-           all_configs = FALSE,
-           ...) {
+           all_configs = FALSE) {
+    rlang::check_dots_empty()
     x <- dplyr::select(x, -.order)
-    res <- NextMethod(summarize = summarize, parameters = parameters)
+    res <- collect_predictions(x, summarize = summarize, parameters = parameters)
     if (!all_configs) {
       final_configs <- subset_finished_race(x)
       res <- dplyr::inner_join(res, final_configs, by = ".config")
@@ -646,10 +682,11 @@ collect_predictions.tune_race <-
 #' @inheritParams tune::collect_metrics
 #' @export
 #' @rdname collect_predictions
-collect_metrics.tune_race <- function(x, summarize = TRUE, all_configs = FALSE, ...) {
+collect_metrics.tune_race <- function(x, ..., summarize = TRUE, type = c("long", "wide"), all_configs = FALSE) {
+  rlang::check_dots_empty()
   x <- dplyr::select(x, -.order)
   final_configs <- subset_finished_race(x)
-  res <- NextMethod(summarize = summarize, ...)
+  res <- collect_metrics(x, summarize = summarize, type = type)
   if (!all_configs) {
     final_configs <- subset_finished_race(x)
     res <- dplyr::inner_join(res, final_configs, by = ".config")
@@ -669,10 +706,31 @@ collect_metrics.tune_race <- function(x, summarize = TRUE, all_configs = FALSE, 
 #' resampled). Comparing performance metrics for configurations averaged with
 #' different resamples is likely to lead to inappropriate results.
 #' @export
-show_best.tune_race <- function(x, metric = NULL, n = 5, ...) {
+show_best.tune_race <- function(x,
+                                ...,
+                                metric = NULL,
+                                eval_time = NULL,
+                                n = 5,
+                                call = rlang::current_env()) {
+  rlang::check_dots_empty()
+  if (!is.null(metric)) {
+    # What was used to judge the race and how are they being sorted now?
+    metrics <- tune::.get_tune_metrics(x)
+    tune::check_metric_in_tune_results(tibble::as_tibble(metrics), metric)
+    opt_metric <- tune::first_metric(metrics)
+    opt_metric_name <- opt_metric$metric
+    if (metric[1] != opt_metric_name) {
+      cli::cli_warn("Metric {.val {opt_metric_name}} was used to evaluate model
+                   candidates in the race but {.val {metric}} has been chosen
+                   to rank the candidates. These results may not agree with the
+                   race.")
+    }
+  }
+
   x <- dplyr::select(x, -.order)
   final_configs <- subset_finished_race(x)
-  res <- NextMethod(metric = metric, n = Inf, ...)
+
+  res <- NextMethod(metric = metric, eval_time = eval_time, n = Inf, call = call)
   res$.ranked <- 1:nrow(res)
   res <- dplyr::inner_join(res, final_configs, by = ".config")
   res$.ranked <- NULL
@@ -693,3 +751,27 @@ subset_finished_race <- function(x) {
   final_configs <- dplyr::select(final_configs, .config)
   final_configs
 }
+
+# ------------------------------------------------------------------------------
+# Log the objective function used for racing
+
+racing_obj_log <- function(analysis_metric, direction, control, metrics_time = NULL) {
+  cols <- tune::get_tune_colors()
+  if (control$verbose_elim) {
+    msg <- paste("Racing will", direction, "the", analysis_metric, "metric")
+
+    if (!is.null(metrics_time)) {
+      msg <- paste(msg, "at time", format(metrics_time, digits = 3))
+    }
+    msg <- paste0(msg, ".")
+
+    cli::cli_inform(cols$message$info(paste0(cli::symbol$info, " ", msg)))
+    if (control$randomize) {
+      msg <- "Resamples are analyzed in a random order."
+      cli::cli_inform(cols$message$info(paste0(cli::symbol$info, " ", msg)))
+    }
+  }
+  invisible(NULL)
+}
+
+
