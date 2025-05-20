@@ -10,13 +10,14 @@ NULL
 #' @importFrom stats qt runif coef confint lm reorder rnorm setNames dist
 #' @importFrom utils globalVariables
 #' @importFrom rlang syms caller_env
-#' @importFrom dplyr %>% distinct
+#' @importFrom dplyr distinct
 #' @importFrom utils globalVariables
 #' @import tune
 NULL
 
 # ------------------------------------------------------------------------------
 
+# fmt: skip
 utils::globalVariables(
   c(
     ".config", ".estimate", ".iter", ".metric", ".parent", "B", "Estimate",
@@ -26,4 +27,3 @@ utils::globalVariables(
     "orig", "stage", "symb", "id2", ".rand", ".eval_time"
   )
 )
-

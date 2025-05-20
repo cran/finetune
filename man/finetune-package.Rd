@@ -8,7 +8,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-The ability to tune models is important. 'finetune' enhances the 'tune' package by providing more specialized methods for finding reasonable values of model tuning parameters. Two racing methods described by Kuhn (2014) \href{https://arxiv.org/abs/1405.6974}{arXiv:1405.6974} are included. An iterative search method using generalized simulated annealing (Bohachevsky, Johnson and Stein, 1986) \doi{10.1080/00401706.1986.10488128} is also included.
+The ability to tune models is important. 'finetune' enhances the 'tune' package by providing more specialized methods for finding reasonable values of model tuning parameters. Two racing methods described by Kuhn (2014) \doi{10.48550/arXiv.1405.6974} are included. An iterative search method using generalized simulated annealing (Bohachevsky, Johnson and Stein, 1986) \doi{10.1080/00401706.1986.10488128} is also included.
 }
 \seealso{
 Useful links:
@@ -24,7 +24,7 @@ Useful links:
 
 Other contributors:
 \itemize{
-  \item Posit Software, PBC [copyright holder, funder]
+  \item Posit Software, PBC (03wc8by49) [copyright holder, funder]
 }
 
 }

@@ -3,34 +3,33 @@ options(dplyr.summarise.inform = FALSE)
 ## -----------------------------------------------------------------------------
 # Racing via repeated measures ANOVA
 
-
 mod2tibble <- function(x) {
-  x %>%
-    tibble::as_tibble(rownames = ".config") %>%
-    dplyr::filter(grepl("\\.config", .config)) %>%
+  x |>
+    tibble::as_tibble(rownames = ".config") |>
+    dplyr::filter(grepl("\\.config", .config)) |>
     dplyr::mutate(.config = gsub("^\\.config", "", .config))
 }
 
 refactor_by_mean <- function(res, maximize = TRUE) {
   configs <-
-    res %>%
+    res |>
     dplyr::select(dplyr::starts_with("id"), .estimate, .config)
 
   ## ---------------------------------------------------------------------------
   # regroup .configs by mean and subset on those being analyzed
 
   best_config <-
-    configs %>%
-    dplyr::group_by(.config) %>%
+    configs |>
+    dplyr::group_by(.config) |>
     dplyr::summarize(
       mean = mean(.estimate, na.rm = TRUE),
       B = sum(!is.na(.estimate))
-    ) %>%
+    ) |>
     dplyr::ungroup()
 
   max_resamples <- max(best_config$B, na.rm = TRUE)
-  best_config <- best_config %>% dplyr::filter(B == max_resamples)
-  configs <- configs %>% dplyr::filter(.config %in% best_config$.config)
+  best_config <- best_config |> dplyr::filter(B == max_resamples)
+  configs <- configs |> dplyr::filter(.config %in% best_config$.config)
   if (maximize) {
     config_levels <- best_config$.config[order(-best_config$mean)]
   } else {
@@ -50,7 +49,7 @@ test_parameters_gls <- function(x, alpha = 0.05, eval_time = NULL) {
   maximize <- metric_data$direction[1] == "maximize"
 
   res <-
-    tune::collect_metrics(x, summarize = FALSE) %>%
+    tune::collect_metrics(x, summarize = FALSE) |>
     dplyr::filter(.metric == metric)
 
   if (!is.null(eval_time) && any(names(res) == ".eval_time")) {
@@ -58,8 +57,8 @@ test_parameters_gls <- function(x, alpha = 0.05, eval_time = NULL) {
   }
 
   key <-
-    res %>%
-    dplyr::select(!!!param_names, .config) %>%
+    res |>
+    dplyr::select(!!!param_names, .config) |>
     dplyr::distinct()
 
   configs <- refactor_by_mean(res, maximize)
@@ -69,30 +68,30 @@ test_parameters_gls <- function(x, alpha = 0.05, eval_time = NULL) {
   mod_est <- fit_anova(x, configs, alpha)
 
   # rs_pct <-
-  # lme4::VarCorr(mod) %>%
-  # tibble::as_tibble(rownames = "terms") %>%
-  # dplyr::mutate(var = sdcor^2, pct = var/sum(var)*100) %>%
-  # dplyr::filter(grp == "id") %>%
-  # dplyr::pull(pct) %>%
+  # lme4::VarCorr(mod) |>
+  # tibble::as_tibble(rownames = "terms") |>
+  # dplyr::mutate(var = sdcor^2, pct = var/sum(var)*100) |>
+  # dplyr::filter(grp == "id") |>
+  # dplyr::pull(pct) |>
   # round(2)
 
   # point_est <-
-  #   coef(summary(mod)) %>%
-  #   mer2tibble() %>%
+  #   coef(summary(mod)) |>
+  #   mer2tibble() |>
   #   dplyr::select(.config, estimate = Estimate)
   # mod_est <-
-  #   confint(mod, method = "Wald", level = 1 - alpha, quiet = TRUE) %>%
-  #   mer2tibble() %>%
-  #   setNames(c(".config", "lower", "upper")) %>%
+  #   confint(mod, method = "Wald", level = 1 - alpha, quiet = TRUE) |>
+  #   mer2tibble() |>
+  #   setNames(c(".config", "lower", "upper")) |>
   #   dplyr::inner_join(point_est, by = ".config")
 
   if (maximize) {
     mod_est <-
-      mod_est %>%
+      mod_est |>
       dplyr::mutate(pass = ifelse(upper > 0, TRUE, FALSE))
   } else {
     mod_est <-
-      mod_est %>%
+      mod_est |>
       dplyr::mutate(pass = ifelse(lower < 0, TRUE, FALSE))
   }
 
@@ -105,7 +104,7 @@ test_parameters_gls <- function(x, alpha = 0.05, eval_time = NULL) {
       pass = TRUE
     )
 
-  dplyr::bind_rows(best_res, mod_est) %>%
+  dplyr::bind_rows(best_res, mod_est) |>
     dplyr::inner_join(key, by = ".config")
 }
 
@@ -120,7 +119,7 @@ test_parameters_bt <- function(x, alpha = 0.05, eval_time = NULL) {
   maximize <- metric_data$direction[1] == "maximize"
 
   res <-
-    tune::collect_metrics(x, summarize = FALSE) %>%
+    tune::collect_metrics(x, summarize = FALSE) |>
     dplyr::filter(.metric == metric)
 
   if (!is.null(eval_time) && any(names(res) == ".eval_time")) {
@@ -128,19 +127,19 @@ test_parameters_bt <- function(x, alpha = 0.05, eval_time = NULL) {
   }
 
   key <-
-    res %>%
-    dplyr::select(!!!param_names, .config) %>%
+    res |>
+    dplyr::select(!!!param_names, .config) |>
     dplyr::distinct()
 
   ## ---------------------------------------------------------------------------
   # Analyze data only on current candidate set
 
   num_resamples <-
-    res %>%
+    res |>
     dplyr::count(.config, name = "B")
   max_resamples <- max(num_resamples$B)
   analysis_config <-
-    num_resamples %>%
+    num_resamples |>
     dplyr::filter(B == max_resamples)
   analysis_data <- dplyr::inner_join(res, analysis_config, by = ".config")
 
@@ -160,17 +159,21 @@ test_parameters_bt <- function(x, alpha = 0.05, eval_time = NULL) {
 
   best_team <- levels(season_data$scoring$player_1)[1]
   suppressWarnings(
-    mod <- BradleyTerry2::BTm(cbind(wins_1, wins_2), player_1, player_2,
-      data = season_data$scoring, br = TRUE
+    mod <- BradleyTerry2::BTm(
+      cbind(wins_1, wins_2),
+      player_1,
+      player_2,
+      data = season_data$scoring,
+      br = TRUE
     )
   )
 
   q_val <- qt(1 - alpha, 1)
   mod_est <-
-    summary(mod) %>%
-    purrr::pluck("coefficients") %>%
-    tibble::as_tibble(rownames = ".config") %>%
-    dplyr::select(.config, value = Estimate, std_err = `Std. Error`) %>%
+    summary(mod) |>
+    purrr::pluck("coefficients") |>
+    tibble::as_tibble(rownames = ".config") |>
+    dplyr::select(.config, value = Estimate, std_err = `Std. Error`) |>
     dplyr::mutate(
       .config = gsub("^\\.\\.", "", .config),
       lower = value - q_val * std_err,
@@ -178,17 +181,20 @@ test_parameters_bt <- function(x, alpha = 0.05, eval_time = NULL) {
       # The secondary conditions are for cases when a candidate set wins
       # a single competition.
       pass = ifelse(upper > 0 & std_err < 500, TRUE, FALSE)
-    ) %>%
+    ) |>
     dplyr::bind_rows(make_best_results(best_team))
 
   ## TODO For both racing methods, make this a function with the configs as
   ## arguments.
   if (length(season_data$eliminated) > 0) {
-    mod_est <- dplyr::bind_rows(mod_est, make_elim_results(season_data$eliminated))
+    mod_est <- dplyr::bind_rows(
+      mod_est,
+      make_elim_results(season_data$eliminated)
+    )
   }
 
   mod_est <-
-    mod_est %>%
+    mod_est |>
     dplyr::inner_join(key, by = ".config")
 
   mod_est
@@ -239,7 +245,7 @@ mercy_rule <- function(dat, key) {
   dplyr::bind_rows(
     make_best_results(best),
     make_elim_results(elim)
-  ) %>%
+  ) |>
     dplyr::inner_join(key, by = ".config")
 }
 
@@ -255,84 +261,109 @@ score_season <- function(x, dat, maximize = FALSE) {
 
   # Look for zero-variance results and duplicated columns
   eliminated <- check_results(dat)
-  x <- x %>% dplyr::filter(!(p1 %in% eliminated) & !(p2 %in% eliminated))
-  dat <- dat %>% dplyr::filter(!(.config %in% eliminated))
+  x <- x |> dplyr::filter(!(p1 %in% eliminated) & !(p2 %in% eliminated))
+  dat <- dat |> dplyr::filter(!(.config %in% eliminated))
   current_teams <- unique(dat$.config)
 
   ## -----------------------------------------------------------------------------
 
   player_1 <-
     dplyr::left_join(
-      x %>%
-        dplyr::mutate(pair = dplyr::row_number()) %>%
+      x |>
+        dplyr::mutate(pair = dplyr::row_number()) |>
         dplyr::select(.config = p1, pair),
       dat,
       by = ".config",
       relationship = "many-to-many"
-    ) %>%
-    dplyr::select(player_1 = .config, metric_1 = .estimate, pair, dplyr::starts_with("id"))
+    ) |>
+    dplyr::select(
+      player_1 = .config,
+      metric_1 = .estimate,
+      pair,
+      dplyr::starts_with("id")
+    )
 
   player_2 <-
     dplyr::left_join(
-      x %>%
-        dplyr::mutate(pair = dplyr::row_number()) %>%
+      x |>
+        dplyr::mutate(pair = dplyr::row_number()) |>
         dplyr::select(.config = p2, pair),
       dat,
       by = ".config",
       relationship = "many-to-many"
-    ) %>%
-    dplyr::select(player_2 = .config, metric_2 = .estimate, pair, dplyr::starts_with("id"))
+    ) |>
+    dplyr::select(
+      player_2 = .config,
+      metric_2 = .estimate,
+      pair,
+      dplyr::starts_with("id")
+    )
 
   game_results <-
-    dplyr::full_join(player_1, player_2, by = c("id", "pair"), relationship = "many-to-many") %>%
+    dplyr::full_join(
+      player_1,
+      player_2,
+      by = c("id", "pair"),
+      relationship = "many-to-many"
+    ) |>
     dplyr::mutate(
-      wins_1 = purrr::map2_dbl(metric_1, metric_2, score_match, maximize = maximize),
-      wins_2 = purrr::map2_dbl(metric_2, metric_1, score_match, maximize = maximize)
+      wins_1 = purrr::map2_dbl(
+        metric_1,
+        metric_2,
+        score_match,
+        maximize = maximize
+      ),
+      wins_2 = purrr::map2_dbl(
+        metric_2,
+        metric_1,
+        score_match,
+        maximize = maximize
+      )
     )
 
   season_results <-
-    game_results %>%
-    dplyr::group_by(player_1, player_2, pair) %>%
+    game_results |>
+    dplyr::group_by(player_1, player_2, pair) |>
     dplyr::summarize(
       wins_1 = sum(wins_1, na.rm = TRUE),
       wins_2 = sum(wins_2, na.rm = TRUE)
-    ) %>%
-    dplyr::ungroup() %>%
+    ) |>
+    dplyr::ungroup() |>
     dplyr::select(-pair)
 
   # Find overall rankings
   player_rankings <-
     dplyr::bind_rows(
-      season_results %>% dplyr::select(player = player_1, wins = wins_1),
-      season_results %>% dplyr::select(player = player_2, wins = wins_2)
-    ) %>%
-    dplyr::group_by(player) %>%
-    dplyr::summarize(wins = sum(wins, na.rm = TRUE)) %>%
-    dplyr::ungroup() %>%
+      season_results |> dplyr::select(player = player_1, wins = wins_1),
+      season_results |> dplyr::select(player = player_2, wins = wins_2)
+    ) |>
+    dplyr::group_by(player) |>
+    dplyr::summarize(wins = sum(wins, na.rm = TRUE)) |>
+    dplyr::ungroup() |>
     dplyr::arrange(dplyr::desc(wins))
 
   if (any(player_rankings$wins == 0)) {
     skunked <- player_rankings$player[player_rankings$wins == 0]
     eliminated <- c(eliminated, skunked)
     season_results <-
-      game_results %>%
-      dplyr::filter(!(player_1 %in% skunked) & !(player_2 %in% skunked)) %>%
-      dplyr::group_by(player_1, player_2, pair) %>%
+      game_results |>
+      dplyr::filter(!(player_1 %in% skunked) & !(player_2 %in% skunked)) |>
+      dplyr::group_by(player_1, player_2, pair) |>
       dplyr::summarize(
         wins_1 = sum(wins_1, na.rm = TRUE),
         wins_2 = sum(wins_2, na.rm = TRUE)
-      ) %>%
-      dplyr::ungroup() %>%
+      ) |>
+      dplyr::ungroup() |>
       dplyr::select(-pair)
 
     player_rankings <-
       dplyr::bind_rows(
-        season_results %>% dplyr::select(player = player_1, wins = wins_1),
-        season_results %>% dplyr::select(player = player_2, wins = wins_2)
-      ) %>%
-      dplyr::group_by(player) %>%
-      dplyr::summarize(wins = sum(wins, na.rm = TRUE)) %>%
-      dplyr::ungroup() %>%
+        season_results |> dplyr::select(player = player_1, wins = wins_1),
+        season_results |> dplyr::select(player = player_2, wins = wins_2)
+      ) |>
+      dplyr::group_by(player) |>
+      dplyr::summarize(wins = sum(wins, na.rm = TRUE)) |>
+      dplyr::ungroup() |>
       dplyr::arrange(dplyr::desc(wins))
   }
 
@@ -344,7 +375,7 @@ score_season <- function(x, dat, maximize = FALSE) {
   }
 
   res <-
-    season_results %>%
+    season_results |>
     dplyr::mutate(
       player_1 = factor(player_1, levels = lvls),
       player_2 = factor(player_2, levels = lvls)
@@ -360,20 +391,20 @@ score_season <- function(x, dat, maximize = FALSE) {
 
 restore_rset <- function(x, index) {
   att <- attributes(x)
-  x <- x %>% dplyr::slice(index)
+  x <- x |> dplyr::slice(index)
   att$row.names <- att$row.names[index]
   attributes(x) <- att
   x
 }
 
 get_configs <- function(x) {
-  tune::collect_metrics(x) %>%
+  tune::collect_metrics(x) |>
     dplyr::distinct(!!!rlang::syms(tune::.get_tune_parameter_names(x)), .config)
 }
 merge_indiv_configs <- function(x, key) {
   orig_names <- names(x)
   param_names <- names(key)[names(key) != ".config"]
-  dplyr::inner_join(x %>% dplyr::select(-.config), key, by = param_names) %>%
+  dplyr::inner_join(x |> dplyr::select(-.config), key, by = param_names) |>
     dplyr::select(!!!orig_names)
 }
 harmonize_configs <- function(x, key) {
@@ -412,7 +443,6 @@ restore_tune <- function(x, y, eval_time_target = NULL) {
   att$row.names <- 1:(nrow(x) + nrow(y))
   att$eval_time_target <- eval_time_target
   att$class <- c("tune_race", "tune_results", class(tibble::tibble()))
-
 
   ## -----------------------------------------------------------------------------
 
@@ -468,8 +498,8 @@ tie_breaker <- function(res, control, eval_time = NULL) {
   metrics_time <- eval_time[1]
 
   x <-
-    res %>%
-    tune::collect_metrics() %>%
+    res |>
+    tune::collect_metrics() |>
     dplyr::filter(.metric == analysis_metric)
 
   if (!is.null(metrics_time)) {
@@ -489,7 +519,7 @@ tie_breaker <- function(res, control, eval_time = NULL) {
     cli::cli_inform(msg)
   }
   res <-
-    dplyr::select(x, .config, !!!param_names) %>%
+    dplyr::select(x, .config, !!!param_names) |>
     dplyr::mutate(
       lower = 0,
       upper = 0,
@@ -507,8 +537,8 @@ check_results <- function(dat, rm_zv = TRUE, rm_dup = FALSE) {
   }
 
   x <-
-    dat %>%
-    dplyr::select(!!!ids, .estimate, .config) %>%
+    dat |>
+    dplyr::select(!!!ids, .estimate, .config) |>
     tidyr::pivot_wider(
       id_cols = c(dplyr::all_of(ids)),
       names_from = .config,
@@ -524,7 +554,7 @@ check_results <- function(dat, rm_zv = TRUE, rm_dup = FALSE) {
   }
 
   if (rm_zv) {
-    is_zv <- purrr::map_lgl(x, ~ length(unique(.x)) == 1)
+    is_zv <- purrr::map_lgl(x, \(x) length(unique(x)) == 1)
     if (any(is_zv)) {
       exclude <- c(exclude, names(x)[is_zv])
       x <- x[, !(names(x) %in% exclude)]
@@ -538,7 +568,7 @@ check_results <- function(dat, rm_zv = TRUE, rm_dup = FALSE) {
 lmer_formula <- function(x, info) {
   f <- .estimate ~ .config + (1 | id)
   if (any(info$class == "vfold_cv") && info$repeats > 1) {
-    ids <- x %>% dplyr::select(id2, id)
+    ids <- x |> dplyr::select(id2, id)
     unique_res <- dplyr::count(ids, id)
     if (nrow(unique_res) > 1 && all(unique_res$n > 1)) {
       f <- .estimate ~ .config + (1 | id2 / id)
@@ -568,12 +598,12 @@ fit_anova <- function(x, dat, alpha) {
     mod <- lm(.estimate ~ .config, data = dat)
   }
   point_est <-
-    coef(summary(mod)) %>%
-    mod2tibble() %>%
+    coef(summary(mod)) |>
+    mod2tibble() |>
     dplyr::select(.config, estimate = Estimate)
   interval_est <-
-    confint(mod, method = "Wald", level = 1 - alpha, quiet = TRUE) %>%
-    mod2tibble() %>%
+    confint(mod, method = "Wald", level = 1 - alpha, quiet = TRUE) |>
+    mod2tibble() |>
     setNames(c(".config", "lower", "upper"))
 
   dplyr::inner_join(point_est, interval_est, by = ".config")
@@ -584,7 +614,7 @@ fit_anova <- function(x, dat, alpha) {
 metric_tibble <- function(x, ...) {
   metrics <- attributes(x)$metrics
   metrics <- attributes(metrics)$metrics
-  directions <- purrr::map_chr(metrics, ~ attr(.x, "direction"))
+  directions <- purrr::map_chr(metrics, \(x) attr(x, "direction"))
   tibble::tibble(metric = names(metrics), direction = directions)
 }
 
@@ -605,11 +635,11 @@ randomize_resamples <- function(x) {
   x$.rand <- runif(B)
   reps <- attr(x, "repeats")
   if (!is.null(reps) && reps > 1) {
-    x <- x %>%
-      dplyr::group_by(id) %>%
+    x <- x |>
+      dplyr::group_by(id) |>
       dplyr::arrange(.rand, .by_group = TRUE)
   } else {
-    x <- x %>% dplyr::arrange(.rand)
+    x <- x |> dplyr::arrange(.rand)
   }
   x$.rand <- NULL
   att$row.names <- att$row.names
@@ -630,20 +660,20 @@ randomize_resamples <- function(x) {
 #' model.
 #' @details
 #'
-#' For [collect_metrics()] and [collect_predictions()], when unsummarized,
-#' there are columns for each tuning parameter (using the `id` from [tune()],
+#' For [tune::collect_metrics()] and [tune::collect_predictions()], when unsummarized,
+#' there are columns for each tuning parameter (using the `id` from [hardhat::tune()],
 #' if any).
-#' [collect_metrics()] also has columns `.metric`, and `.estimator`.  When the
+#' [tune::collect_metrics()] also has columns `.metric`, and `.estimator`.  When the
 #' results are summarized, there are columns for `mean`, `n`, and `std_err`.
 #' When not summarized, the additional columns for the resampling identifier(s)
 #' and `.estimate`.
 #'
-#' For [collect_predictions()], there are additional columns for the resampling
+#' For [tune::collect_predictions()], there are additional columns for the resampling
 #' identifier(s), columns for the predicted values (e.g., `.pred`,
 #' `.pred_class`, etc.), and a column for the outcome(s) using the original
 #' column name(s) in the data.
 #'
-#' [collect_predictions()] can summarize the various results over
+#' [tune::collect_predictions()] can summarize the various results over
 #'  replicate out-of-sample predictions. For example, when using the bootstrap,
 #'  each row in the original training set has multiple holdout predictions
 #'  (across assessment sets). To convert these results to a format where every
@@ -664,14 +694,14 @@ randomize_resamples <- function(x) {
 #' different resamples is likely to lead to inappropriate results.
 #' @name collect_predictions
 collect_predictions.tune_race <-
-  function(x,
-           ...,
-           summarize = FALSE,
-           parameters = NULL,
-           all_configs = FALSE) {
+  function(x, ..., summarize = FALSE, parameters = NULL, all_configs = FALSE) {
     rlang::check_dots_empty()
     x <- dplyr::select(x, -.order)
-    res <- collect_predictions(x, summarize = summarize, parameters = parameters)
+    res <- collect_predictions(
+      x,
+      summarize = summarize,
+      parameters = parameters
+    )
     if (!all_configs) {
       final_configs <- subset_finished_race(x)
       res <- dplyr::inner_join(res, final_configs, by = ".config")
@@ -682,7 +712,13 @@ collect_predictions.tune_race <-
 #' @inheritParams tune::collect_metrics
 #' @export
 #' @rdname collect_predictions
-collect_metrics.tune_race <- function(x, ..., summarize = TRUE, type = c("long", "wide"), all_configs = FALSE) {
+collect_metrics.tune_race <- function(
+  x,
+  ...,
+  summarize = TRUE,
+  type = c("long", "wide"),
+  all_configs = FALSE
+) {
   rlang::check_dots_empty()
   x <- dplyr::select(x, -.order)
   final_configs <- subset_finished_race(x)
@@ -696,7 +732,7 @@ collect_metrics.tune_race <- function(x, ..., summarize = TRUE, type = c("long",
 
 #' Investigate best tuning parameters
 #'
-#' [show_best()] displays the top sub-models and their performance estimates.
+#' [tune::show_best()] displays the top sub-models and their performance estimates.
 #' @inheritParams tune::show_best
 #' @rdname show_best
 #' @param n An integer for the maximum number of top results/rows to return.
@@ -706,12 +742,14 @@ collect_metrics.tune_race <- function(x, ..., summarize = TRUE, type = c("long",
 #' resampled). Comparing performance metrics for configurations averaged with
 #' different resamples is likely to lead to inappropriate results.
 #' @export
-show_best.tune_race <- function(x,
-                                ...,
-                                metric = NULL,
-                                eval_time = NULL,
-                                n = 5,
-                                call = rlang::current_env()) {
+show_best.tune_race <- function(
+  x,
+  ...,
+  metric = NULL,
+  eval_time = NULL,
+  n = 5,
+  call = rlang::current_env()
+) {
   rlang::check_dots_empty()
   if (!is.null(metric)) {
     # What was used to judge the race and how are they being sorted now?
@@ -720,24 +758,30 @@ show_best.tune_race <- function(x,
     opt_metric <- tune::first_metric(metrics)
     opt_metric_name <- opt_metric$metric
     if (metric[1] != opt_metric_name) {
-      cli::cli_warn("Metric {.val {opt_metric_name}} was used to evaluate model
+      cli::cli_warn(
+        "Metric {.val {opt_metric_name}} was used to evaluate model
                    candidates in the race but {.val {metric}} has been chosen
                    to rank the candidates. These results may not agree with the
-                   race.")
+                   race."
+      )
     }
   }
 
   x <- dplyr::select(x, -.order)
   final_configs <- subset_finished_race(x)
 
-  res <- NextMethod(metric = metric, eval_time = eval_time, n = Inf, call = call)
+  res <- NextMethod(
+    metric = metric,
+    eval_time = eval_time,
+    n = Inf,
+    call = call
+  )
   res$.ranked <- 1:nrow(res)
   res <- dplyr::inner_join(res, final_configs, by = ".config")
   res$.ranked <- NULL
   n <- min(n, nrow(res))
-  res[1:n,]
+  res[1:n, ]
 }
-
 
 
 # Only return configurations that were completely resampled
@@ -755,7 +799,12 @@ subset_finished_race <- function(x) {
 # ------------------------------------------------------------------------------
 # Log the objective function used for racing
 
-racing_obj_log <- function(analysis_metric, direction, control, metrics_time = NULL) {
+racing_obj_log <- function(
+  analysis_metric,
+  direction,
+  control,
+  metrics_time = NULL
+) {
   cols <- tune::get_tune_colors()
   if (control$verbose_elim) {
     msg <- paste("Racing will", direction, "the", analysis_metric, "metric")
@@ -773,5 +822,3 @@ racing_obj_log <- function(analysis_metric, direction, control, metrics_time = N
   }
   invisible(NULL)
 }
-
-
